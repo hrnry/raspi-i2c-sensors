@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# cp munin_raspi3_ /usr/share/munin/plugins/
+# ln -s /usr/share/munin/plugins/munin_raspi3_ /etc/munin/plugins/munin_raspi3_am2320
+# ln -s /usr/share/munin/plugins/munin_raspi3_ /etc/munin/plugins/munin_raspi3_tsl25721
+# nano -w /etc/munin/plugin-conf.d/munin-node
+#   [munin_raspi3_*]
+#   user root
+
+#%# family=auto
+#%# capabilities=autoconf suggest
+LANG=C
+
+DEV=$(echo "${0##*/}" | sed s/.*_//g)  # am2320, tsl25721
+
+v=$(curl -sS http://192.168.1.96:8080)  # Date(Ymd),Time(HMS),Temperature(C),Humidity(%RH),Light(Lx)
+list=(${v//,/ })
+
+function isNum() {
+  echo ${1} | grep -e '^-\?[0-9]\+\(\.[0-9]\+\)\?$' >/dev/null 2>&1
+}
+for ((i = 0; i < ${#list[@]}; i++)) {
+  if ! isNum ${list[i]}; then
+    list[i]="0.0"
+  fi
+}
+
+if [ "${1}" = "config" ]; then
+  echo "graph_title RasPi3 ${DEV}"
+  echo 'graph_args --base 1000 -l 0'
+  echo 'graph_vlabel RasPi3 Value'
+  echo 'graph_category other'
+  echo 'graph_info ${DEV}'
+
+  if [ "${DEV}" = "am2320" ]; then
+    echo 'temp.label C'
+    echo 'temp.draw LINE2'
+    echo 'temp.info AM2320 Temperature'
+    echo 'humi.label %RH'
+    echo 'humi.draw LINE2'
+    echo 'humi.info AM2320 Humidity'
+  elif [ "${DEV}" = "tsl25721" ]; then
+    echo 'lux.label Lx'
+    echo 'lux.draw LINE2'
+    echo 'lux.info TSL25721 Lux'
+  fi
+
+  exit 0
+fi
+
+if [ "${DEV}" = "am2320" ]; then
+  echo "temp.value ${list[2]}"
+  echo "humi.value ${list[3]}"
+elif [ "${DEV}" = "tsl25721" ]; then
+  echo "lux.value ${list[4]}"
+fi
